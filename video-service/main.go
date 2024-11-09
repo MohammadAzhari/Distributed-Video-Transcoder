@@ -5,9 +5,14 @@ import (
 	"github.com/MohammadAzhari/Distributed-Video-Transcoder/video-service/producer"
 )
 
-func main() {
+const (
+	kafkaHost = "localhost:9092"
+	topic     = "video"
+)
 
-	producer := producer.NewProducer()
+func main() {
+	producer := producer.NewProducer(kafkaHost, topic)
+	defer producer.Close()
 
 	server := api.NewServer(producer)
 	server.Start(":8080")

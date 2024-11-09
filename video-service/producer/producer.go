@@ -1,29 +1,48 @@
 package producer
 
 import (
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"log"
+
+	"github.com/IBM/sarama"
 )
 
 type Producer struct {
-	producer *kafka.Producer
+	topic   string
+	conn    sarama.SyncProducer
 }
 
-func NewProducer() *Producer {
-	producer, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
-	})
+type Message struct {
+	Key   string
+	Value string
+}
 
+func NewProducer(kafkaHost string, topic string) *Producer {
+	config := sarama.NewConfig()
+	config.Producer.Return.Successes = true
+	config.Metadata.AllowAutoTopicCreation = false
+
+	conn, err := sarama.NewSyncProducer([]string{kafkaHost}, config)
 	if err != nil {
-		panic(err)
+		log.Fatal("Could not connect to Kafka: ", err)
 	}
 
-	return &Producer{producer: producer}
+	return &Producer{
+		conn: conn,
+		topic: topic,
+	}
 }
 
-func (p *Producer) Produce(topic string, partition int32, key string, message string) {
-	p.producer.Produce(&kafka.Message{
-		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: partition},
-		Key:            []byte(key),
-		Value:          []byte(message),
-	}, nil)
+func (p *Producer) SendMessage(message *Message) (partition int32, offset int64, err error) {
+	log.Printf("Sending message: %v, %v", len(message.Value), message.Key)
+	partition, offset, err = p.conn.SendMessage(&sarama.ProducerMessage{
+		Topic: p.topic,
+		Value: sarama.StringEncoder(message.Value),
+		Key:   sarama.StringEncoder(message.Key),
+	})
+	log.Printf("Sent message: %v, partition: %v, offset: %v", len(message.Value), partition, offset)
+	return
+}
+
+func (p *Producer) Close() error {
+	return p.conn.Close()
 }
