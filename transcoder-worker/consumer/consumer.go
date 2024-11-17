@@ -8,6 +8,7 @@ import (
 )
 
 type Consumer struct {
+	group sarama.ConsumerGroup
 }
 
 func NewConsumer(kafkaHost string, topic string) *Consumer {
@@ -23,15 +24,25 @@ func NewConsumer(kafkaHost string, topic string) *Consumer {
 	}
 
 	ctx := context.Background()
-	for {
-		topics := []string{topic}
-		handler := ConsumerGroupHandler{
-			handler: handler.NewHandler(),
-		}
+	go func() {
+		for {
+			topics := []string{topic}
+			handler := ConsumerGroupHandler{
+				handler: handler.NewHandler(),
+			}
 
-		err := group.Consume(ctx, topics, &handler)
-		if err != nil {
-			panic(err)
+			err := group.Consume(ctx, topics, &handler)
+			if err != nil {
+				panic(err)
+			}
 		}
+	}()
+
+	return &Consumer{
+		group: group,
 	}
+}
+
+func (c *Consumer) Close() {
+	c.group.Close()
 }

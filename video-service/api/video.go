@@ -2,12 +2,14 @@ package api
 
 import (
 	"errors"
-	"fmt"
 	"io"
-	"log"
+	"strings"
 
+	db "github.com/MohammadAzhari/Distributed-Video-Transcoder/video-service/db/sqlc"
 	"github.com/MohammadAzhari/Distributed-Video-Transcoder/video-service/producer"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (s *Server) uploadVideo(ctx *gin.Context) {
@@ -19,8 +21,10 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 		return
 	}
 
-	fmt.Printf("File name: %s\n", header.Filename)
-	fmt.Printf("File size: %d\n", header.Size)
+	if !strings.HasSuffix(header.Filename, ".mp4") {
+		ctx.JSON(400, gin.H{"error": "Only mp4 files are allowed"})
+		return
+	}
 
 	buffer := make([]byte, 1024*8)
 
@@ -31,7 +35,6 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 
 	for {
 		n, err := file.Read(buffer)
-		fmt.Println("n:", n)
 
 		if err != nil && !errors.Is(err, io.EOF) {
 			ctx.JSON(400, gin.H{"error": err.Error()})
@@ -47,7 +50,6 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 			Value: string(buffer[:n]),
 		})
 		if err != nil {
-			log.Println("Here", err)
 			ctx.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
@@ -58,5 +60,57 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 		Value: "close file",
 	})
 
-	ctx.JSON(200, gin.H{"message": "Video uploaded successfully"})
+	video, err := s.store.CreateVideo(ctx, header.Filename)
+
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(200, video)
+}
+
+func (s *Server) processCompleted(ctx *gin.Context) {
+	videoId, ok := ctx.Params.Get("videoId")
+	ip := ctx.ClientIP()
+
+	if !ok {
+		ctx.JSON(400, gin.H{"error": "Invalid video id"})
+		return
+	}
+
+	arg := db.PublishVideoParams{
+		WorkerIp: pgtype.Text{
+			String: ip,
+			Valid:  true,
+		},
+		ID: uuid.UUID([]byte(videoId)),
+	}
+
+	video, err := s.store.PublishVideo(ctx, arg)
+
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(200, video)
+}
+
+func (s *Server) getVideo(ctx *gin.Context) {
+	videoId, ok := ctx.Params.Get("videoId")
+
+	if !ok {
+		ctx.JSON(400, gin.H{"error": "Invalid video id"})
+		return
+	}
+
+	video, err := s.store.GetVideo(ctx, uuid.UUID([]byte(videoId)))
+
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(200, video)
 }

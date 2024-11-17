@@ -34,7 +34,6 @@ func (h ConsumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, cla
 		default:
 			h.handler.Process(string(msg.Key), msg.Value)
 		}
-		log.Printf("Message topic:%q partition:%d offset:%d\n, valueLength: %v", msg.Topic, msg.Partition, msg.Offset, len(msg.Value))
 		sess.MarkMessage(msg, "")
 	}
 	return nil

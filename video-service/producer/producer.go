@@ -7,8 +7,8 @@ import (
 )
 
 type Producer struct {
-	topic   string
-	conn    sarama.SyncProducer
+	topic string
+	conn  sarama.SyncProducer
 }
 
 type Message struct {
@@ -27,19 +27,17 @@ func NewProducer(kafkaHost string, topic string) *Producer {
 	}
 
 	return &Producer{
-		conn: conn,
+		conn:  conn,
 		topic: topic,
 	}
 }
 
 func (p *Producer) SendMessage(message *Message) (partition int32, offset int64, err error) {
-	log.Printf("Sending message: %v, %v", len(message.Value), message.Key)
 	partition, offset, err = p.conn.SendMessage(&sarama.ProducerMessage{
 		Topic: p.topic,
 		Value: sarama.StringEncoder(message.Value),
 		Key:   sarama.StringEncoder(message.Key),
 	})
-	log.Printf("Sent message: %v, partition: %v, offset: %v", len(message.Value), partition, offset)
 	return
 }
 
