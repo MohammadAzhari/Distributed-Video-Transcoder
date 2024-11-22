@@ -1,15 +1,15 @@
 -- name: CreateVideo :one
 INSERT INTO videos (
-  filename, status
+  id, filename, status
 ) VALUES (
-  $1, 'new'
+  $1, $2, 'new'
 )
 RETURNING *;
 
 
 -- name: PublishVideo :one
 UPDATE videos
-SET status = 'done', worker_ip = $2
+SET status = 'done', worker_ip = $2, scales = $3
 WHERE id = $1
 RETURNING *;
 

@@ -28,8 +28,20 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 
 	buffer := make([]byte, 1024*8)
 
+	arg := db.CreateVideoParams{
+		Filename: header.Filename,
+		ID:       uuid.New(),
+	}
+
+	video, err := s.store.CreateVideo(ctx, arg)
+
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
 	s.producer.SendMessage(&producer.Message{
-		Key:   header.Filename,
+		Key:   video.ID.String(),
 		Value: "new file",
 	})
 
@@ -46,7 +58,7 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 		}
 
 		_, _, err = s.producer.SendMessage(&producer.Message{
-			Key:   header.Filename,
+			Key:   video.ID.String(),
 			Value: string(buffer[:n]),
 		})
 		if err != nil {
@@ -56,26 +68,36 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 	}
 
 	s.producer.SendMessage(&producer.Message{
-		Key:   header.Filename,
+		Key:   video.ID.String(),
 		Value: "close file",
 	})
 
-	video, err := s.store.CreateVideo(ctx, header.Filename)
-
-	if err != nil {
-		ctx.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-
 	ctx.JSON(200, video)
+}
+
+type ProccessCompletedRequest struct {
+	Scales []string `json:"scales"`
 }
 
 func (s *Server) processCompleted(ctx *gin.Context) {
 	videoId, ok := ctx.Params.Get("videoId")
 	ip := ctx.ClientIP()
+	var request ProccessCompletedRequest
+
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 
 	if !ok {
 		ctx.JSON(400, gin.H{"error": "Invalid video id"})
+		return
+	}
+
+	uuid, err := uuid.Parse(videoId)
+
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -84,7 +106,8 @@ func (s *Server) processCompleted(ctx *gin.Context) {
 			String: ip,
 			Valid:  true,
 		},
-		ID: uuid.UUID([]byte(videoId)),
+		ID:     uuid,
+		Scales: request.Scales,
 	}
 
 	video, err := s.store.PublishVideo(ctx, arg)
@@ -105,7 +128,14 @@ func (s *Server) getVideo(ctx *gin.Context) {
 		return
 	}
 
-	video, err := s.store.GetVideo(ctx, uuid.UUID([]byte(videoId)))
+	uuid, err := uuid.Parse(videoId)
+
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	video, err := s.store.GetVideo(ctx, uuid)
 
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})

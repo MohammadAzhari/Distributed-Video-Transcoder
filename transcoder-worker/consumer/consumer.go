@@ -11,7 +11,7 @@ type Consumer struct {
 	group sarama.ConsumerGroup
 }
 
-func NewConsumer(kafkaHost string, topic string) *Consumer {
+func NewConsumer(kafkaHost string, topic string, videoServiceAddress string) *Consumer {
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
@@ -27,11 +27,11 @@ func NewConsumer(kafkaHost string, topic string) *Consumer {
 	go func() {
 		for {
 			topics := []string{topic}
-			handler := ConsumerGroupHandler{
-				handler: handler.NewHandler(),
+			handler := &ConsumerGroupHandler{
+				handler: handler.NewHandler(videoServiceAddress),
 			}
 
-			err := group.Consume(ctx, topics, &handler)
+			err := group.Consume(ctx, topics, handler)
 			if err != nil {
 				panic(err)
 			}

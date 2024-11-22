@@ -2,6 +2,7 @@ package producer
 
 import (
 	"log"
+	"time"
 
 	"github.com/IBM/sarama"
 )
@@ -21,10 +22,21 @@ func NewProducer(kafkaHost string, topic string) *Producer {
 	config.Producer.Return.Successes = true
 	config.Metadata.AllowAutoTopicCreation = false
 
-	conn, err := sarama.NewSyncProducer([]string{kafkaHost}, config)
+	var conn sarama.SyncProducer
+	var err error
+	for i := 0; i < 10; i++ {
+		conn, err = sarama.NewSyncProducer([]string{kafkaHost}, config)
+		if err == nil {
+			break
+		}
+		log.Print("Could not connect to Kafka: ", err)
+		time.Sleep(time.Duration(i) * time.Second)
+	}
 	if err != nil {
 		log.Fatal("Could not connect to Kafka: ", err)
 	}
+
+	log.Printf("Connected to Kafka at: %s, topic: %s", kafkaHost, topic)
 
 	return &Producer{
 		conn:  conn,

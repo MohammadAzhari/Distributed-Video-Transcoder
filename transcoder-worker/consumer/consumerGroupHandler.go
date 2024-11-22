@@ -26,13 +26,15 @@ func (ConsumerGroupHandler) Cleanup(_ sarama.ConsumerGroupSession) error {
 func (h ConsumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	// This is where you put your message handling logic
 	for msg := range claim.Messages() {
+		key := string(msg.Key)
+		log.Printf("Message claimed: key=%s topic=%q partition=%d offset=%d\n", key, msg.Topic, msg.Partition, msg.Offset)
 		switch string(msg.Value) {
 		case "new file":
-			h.handler.Init(string(msg.Key))
+			h.handler.Init(key)
 		case "close file":
-			h.handler.End(string(msg.Key))
+			h.handler.End(key)
 		default:
-			h.handler.Process(string(msg.Key), msg.Value)
+			h.handler.Process(key, msg.Value)
 		}
 		sess.MarkMessage(msg, "")
 	}

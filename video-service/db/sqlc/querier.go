@@ -11,7 +11,7 @@ import (
 )
 
 type Querier interface {
-	CreateVideo(ctx context.Context, filename string) (Video, error)
+	CreateVideo(ctx context.Context, arg CreateVideoParams) (Video, error)
 	GetVideo(ctx context.Context, id uuid.UUID) (Video, error)
 	PublishVideo(ctx context.Context, arg PublishVideoParams) (Video, error)
 }

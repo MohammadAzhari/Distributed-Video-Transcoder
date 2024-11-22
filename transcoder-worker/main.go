@@ -1,22 +1,48 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/MohammadAzhari/Distributed-Video-Transcoder/transcoder-worker/consumer"
 	"github.com/gin-gonic/gin"
-)
-
-const (
-	kafkaHost = "localhost:9092"
-	topic     = "video"
+	"github.com/spf13/viper"
 )
 
 func main() {
-	consumer := consumer.NewConsumer(kafkaHost, topic)
+	config, err := LoadConfig(".")
+	if err != nil {
+		log.Fatal("Could not load config: ", err)
+	}
+
+	consumer := consumer.NewConsumer(config.KafkaHost, config.KafkaTopic, config.VideoServiceAddress)
 	defer consumer.Close()
 
 	router := gin.Default()
 	router.StaticFS("/", http.Dir("uploads"))
-	router.Run(":8081")
+	router.Run(config.Port)
+}
+
+type Config struct {
+	KafkaHost           string `mapstructure:"KAFKA_HOST"`
+	KafkaTopic          string `mapstructure:"KAFKA_TOPIC"`
+	Port                string `mapstructure:"PORT"`
+	VideoServiceAddress string `mapstructure:"VIDEO_SERVICE_ADDRESS"`
+}
+
+// LoadConfig reads configuration from file or environment variables.
+func LoadConfig(path string) (config Config, err error) {
+	viper.AddConfigPath(path)
+	viper.SetConfigName("app")
+	viper.SetConfigType("env")
+
+	viper.AutomaticEnv()
+
+	err = viper.ReadInConfig()
+	if err != nil {
+		return
+	}
+
+	err = viper.Unmarshal(&config)
+	return
 }

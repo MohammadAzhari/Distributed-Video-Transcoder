@@ -2,6 +2,7 @@ package transcoder
 
 import (
 	"log"
+	"os"
 	"os/exec"
 	"sync"
 )
@@ -19,26 +20,47 @@ func init() {
 	}
 }
 
-func transcodeVideo(inputFileName, scale string) {
-	outputFileName := inputFileName[:len(inputFileName)-4] + "_" + scale + ".mp4"
+func transcodeVideo(inputFileName, scale string, ch chan string) {
+	outputFileName := inputFileName + "_" + scale + ".mp4"
 	cmd := exec.Command("ffmpeg", "-i", "uploads/"+inputFileName,
 		"-vf", scalesMap[scale], "-c:v", "libx264", "-crf", "23",
 		"-c:a", "copy", "uploads/"+outputFileName)
 
-	err := cmd.Run()
-	if err != nil {
-		log.Printf("Error running ffmpeg for %s: %v", inputFileName, err)
+	if scale == "1080p" {
+		cmd.Run()
+	}
+	// check if the video exist in the disk
+	if _, err := os.Stat("uploads/" + outputFileName); err != nil {
+		log.Printf("Error transcoding video: %v, scale: %v", err, scale)
+		ch <- scale
 	}
 }
 
-func Transcode(key string) {
+func Transcode(key string) []string {
 	var wg sync.WaitGroup
+	errChan := make(chan string, len(scales))
+
 	for _, scale := range scales {
 		wg.Add(1)
 		go func(scale string) {
 			defer wg.Done()
-			transcodeVideo(key, scale)
+			transcodeVideo(key, scale, errChan)
 		}(scale)
 	}
+
 	wg.Wait()
+	close(errChan)
+	erroredScales := make(map[string]bool)
+	for scale := range errChan {
+		erroredScales[scale] = true
+	}
+
+	transcodedScales := make([]string, 0)
+	for _, scale := range scales {
+		if _, ok := erroredScales[scale]; !ok {
+			transcodedScales = append(transcodedScales, scale)
+		}
+	}
+
+	return transcodedScales
 }

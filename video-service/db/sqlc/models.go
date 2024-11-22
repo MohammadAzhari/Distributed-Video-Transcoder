@@ -63,4 +63,5 @@ type Video struct {
 	WorkerIp  pgtype.Text `json:"worker_ip"`
 	CreatedAt time.Time   `json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
+	Scales    []string    `json:"scales"`
 }

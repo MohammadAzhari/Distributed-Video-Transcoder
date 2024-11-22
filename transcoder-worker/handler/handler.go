@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -9,19 +11,21 @@ import (
 )
 
 type Handler struct {
-	destsMap map[string]*os.File
+	destsMap            map[string]*os.File
+	videoServiceAddress string
 }
 
-func NewHandler() *Handler {
+func NewHandler(videoServiceAddress string) *Handler {
 	return &Handler{
-		destsMap: make(map[string]*os.File),
+		destsMap:            make(map[string]*os.File),
+		videoServiceAddress: videoServiceAddress,
 	}
 }
 
 func (h *Handler) Init(key string) {
 	dest, err := os.Create("uploads/" + key)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Error creating file: %v", err)
 	}
 	h.destsMap[key] = dest
 }
@@ -41,9 +45,18 @@ func (h *Handler) End(key string) {
 	dest.Close()
 	delete(h.destsMap, key)
 
-	transcoder.Transcode(key)
+	scales := transcoder.Transcode(key)
+
+	data := map[string]any{
+		"scales": scales,
+	}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Println("Error marshaling JSON:", err)
+		return
+	}
 	// send http request to the video service that the transcoding is done
-	res, err := http.Post("http://localhost:8080/prossess-completed/"+key, "", nil)
+	res, err := http.Post(h.videoServiceAddress+"/prossess-completed/"+key, "Application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Error sending request to video service: %v", err)
 	}
