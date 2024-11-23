@@ -12,8 +12,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const (
+	newFile   = "new file"
+	closeFile = "close file"
+)
+
 func (s *Server) uploadVideo(ctx *gin.Context) {
-	// receive bytes from request let's say n bytes at a time
 	file, header, err := ctx.Request.FormFile("video")
 
 	if err != nil {
@@ -42,7 +46,7 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 
 	s.producer.SendMessage(&producer.Message{
 		Key:   video.ID.String(),
-		Value: "new file",
+		Value: newFile,
 	})
 
 	for {
@@ -69,7 +73,7 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 
 	s.producer.SendMessage(&producer.Message{
 		Key:   video.ID.String(),
-		Value: "close file",
+		Value: closeFile,
 	})
 
 	ctx.JSON(200, video)
@@ -77,11 +81,17 @@ func (s *Server) uploadVideo(ctx *gin.Context) {
 
 type ProccessCompletedRequest struct {
 	Scales []string `json:"scales"`
+	Port   string   `json:"port"`
 }
 
 func (s *Server) processCompleted(ctx *gin.Context) {
 	videoId, ok := ctx.Params.Get("videoId")
-	ip := ctx.ClientIP()
+
+	if !ok {
+		ctx.JSON(400, gin.H{"error": "Invalid video id"})
+		return
+	}
+
 	var request ProccessCompletedRequest
 
 	if err := ctx.ShouldBindJSON(&request); err != nil {
@@ -89,10 +99,7 @@ func (s *Server) processCompleted(ctx *gin.Context) {
 		return
 	}
 
-	if !ok {
-		ctx.JSON(400, gin.H{"error": "Invalid video id"})
-		return
-	}
+	workerIp := ctx.ClientIP() + request.Port
 
 	uuid, err := uuid.Parse(videoId)
 
@@ -103,7 +110,7 @@ func (s *Server) processCompleted(ctx *gin.Context) {
 
 	arg := db.PublishVideoParams{
 		WorkerIp: pgtype.Text{
-			String: ip,
+			String: workerIp,
 			Valid:  true,
 		},
 		ID:     uuid,

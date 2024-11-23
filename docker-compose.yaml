@@ -34,7 +34,7 @@ services:
     volumes:
       - dvt-pg:/var/lib/postgresql/data
 
-  vidoe-service:
+  video-service:
     build: ./video-service
     container_name: video-service
     ports:
@@ -46,6 +46,21 @@ services:
       - KAFKA_TOPIC=video
       - PORT=:8080
       - DB_SOURCE=postgres://postgres:postgres@postgres:5432/dvt?sslmode=disable
+
+  transcoder-worker:
+    build: ./transcoder-worker
+    ports:
+      - "8081"
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_HOST=kafka:9092
+      - KAFKA_TOPIC=video
+      - PORT=:8081
+      - VIDEO_SERVICE_ADDRESS=http://video-service:8080
+    deploy:
+      replicas: 3
+
 volumes:
   dvt-pg:
   kafka-data:

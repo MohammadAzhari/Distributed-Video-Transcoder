@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/MohammadAzhari/Distributed-Video-Transcoder/transcoder-worker/communicator"
 	"github.com/MohammadAzhari/Distributed-Video-Transcoder/transcoder-worker/consumer"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -15,7 +16,8 @@ func main() {
 		log.Fatal("Could not load config: ", err)
 	}
 
-	consumer := consumer.NewConsumer(config.KafkaHost, config.KafkaTopic, config.VideoServiceAddress)
+	communicator := communicator.NewCommunicator(config.VideoServiceAddress, config.Port)
+	consumer := consumer.NewConsumer(config.KafkaHost, config.KafkaTopic, communicator)
 	defer consumer.Close()
 
 	router := gin.Default()

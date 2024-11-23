@@ -15,10 +15,9 @@ FROM alpine:latest
 
 WORKDIR /
 
+RUN apk add --no-cache ffmpeg
+
 COPY --from=builder /main /main
 COPY app.env app.env
-COPY frontend frontend
-
-EXPOSE 8080
 
 ENTRYPOINT ["/main"]

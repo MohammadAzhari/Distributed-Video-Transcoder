@@ -30,6 +30,10 @@ func (s *Server) setupRoutes() {
 	s.router.POST("/upload-video", s.uploadVideo)
 	s.router.POST("/prossess-completed/:videoId", s.processCompleted)
 	s.router.GET("/video/:videoId", s.getVideo)
+
+	s.router.GET("/", func(ctx *gin.Context) {
+		ctx.File("frontend/index.html")
+	})
 }
 
 func (s *Server) Start(address string) error {

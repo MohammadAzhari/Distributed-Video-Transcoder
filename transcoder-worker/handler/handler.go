@@ -1,65 +1,53 @@
 package handler
 
 import (
-	"bytes"
-	"encoding/json"
 	"log"
-	"net/http"
 	"os"
 
+	"github.com/MohammadAzhari/Distributed-Video-Transcoder/transcoder-worker/communicator"
 	"github.com/MohammadAzhari/Distributed-Video-Transcoder/transcoder-worker/transcoder"
 )
 
 type Handler struct {
-	destsMap            map[string]*os.File
-	videoServiceAddress string
+	destsMap     map[string]*os.File
+	communicator *communicator.Communicator
 }
 
-func NewHandler(videoServiceAddress string) *Handler {
+func NewHandler(communicator *communicator.Communicator) *Handler {
 	return &Handler{
-		destsMap:            make(map[string]*os.File),
-		videoServiceAddress: videoServiceAddress,
+		destsMap:     make(map[string]*os.File),
+		communicator: communicator,
 	}
 }
 
-func (h *Handler) Init(key string) {
-	dest, err := os.Create("uploads/" + key)
+func (h *Handler) Init(videoId string) {
+	_, err := os.Stat("uploads")
+	if os.IsNotExist(err) {
+		os.Mkdir("uploads", os.ModePerm)
+	}
+	dest, err := os.Create("uploads/" + videoId)
 	if err != nil {
 		log.Printf("Error creating file: %v", err)
 	}
-	h.destsMap[key] = dest
+	h.destsMap[videoId] = dest
 }
 
-func (h *Handler) Process(key string, data []byte) {
-	dest := h.destsMap[key]
+func (h *Handler) Process(videoId string, data []byte) {
+	dest := h.destsMap[videoId]
 	if dest != nil {
 		dest.Write(data)
 	}
 }
 
-func (h *Handler) End(key string) {
-	dest := h.destsMap[key]
+func (h *Handler) End(videoId string) {
+	dest := h.destsMap[videoId]
 	if dest == nil {
 		return
 	}
 	dest.Close()
-	delete(h.destsMap, key)
+	delete(h.destsMap, videoId)
 
-	scales := transcoder.Transcode(key)
+	scales := transcoder.Transcode(videoId)
 
-	data := map[string]any{
-		"scales": scales,
-	}
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		log.Println("Error marshaling JSON:", err)
-		return
-	}
-	// send http request to the video service that the transcoding is done
-	res, err := http.Post(h.videoServiceAddress+"/prossess-completed/"+key, "Application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Printf("Error sending request to video service: %v", err)
-	}
-	log.Printf("Response from video service: %v", res.Status)
-	res.Body.Close()
+	h.communicator.PublishVideo(videoId, scales)
 }

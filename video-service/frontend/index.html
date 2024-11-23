@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Distributed Video Transcoder</title>
+  </head>
+  <body>
+    <div
+      style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+      "
+    >
+      <h1>Distributed Video Transcoder</h1>
+      <div id="upload-div" style="text-align: center">
+        <p>
+          Upload a video: (mp4) and it will be transcoded to 480p, 720p and
+          1080p
+        </p>
+        <div>
+          <input style="display: none" accept=".mp4" type="file" id="file" />
+          <label
+            style="
+              border-radius: 10px;
+              padding: 10px;
+              background-color: #2084d0;
+              color: white;
+              cursor: pointer;
+            "
+            for="file"
+            >Upload Video</label
+          >
+        </div>
+      </div>
+
+      <div id="loading-div" style="display: none">
+        <p>Loading...</p>
+      </div>
+
+      <div id="completed-div" style="display: none; flex-direction: column">
+        <p>Video URLs:</p>
+        <a
+          id="480p"
+          href=""
+          target="_blank"
+          style="
+            border-radius: 10px;
+            padding: 10px;
+            background-color: #2084d0;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            margin: 2px;
+            display: none;
+          "
+          >Download 480p</a
+        >
+        <a
+          id="720p"
+          href=""
+          target="_blank"
+          style="
+            border-radius: 10px;
+            padding: 10px;
+            background-color: #2084d0;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            margin: 2px;
+            display: none;
+          "
+          >Download 720p</a
+        >
+        <a
+          id="1080p"
+          href=""
+          target="_blank"
+          style="
+            border-radius: 10px;
+            padding: 10px;
+            background-color: #2084d0;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            margin: 2px;
+            display: none;
+          "
+          >Download 1080p</a
+        >
+      </div>
+
+      <div id="error-div" style="display: none">
+        <p>Something went wrong, please try again</p>
+      </div>
+    </div>
+  </body>
+
+  <script>
+    const uploadDiv = document.getElementById("upload-div");
+    const loadingDiv = document.getElementById("loading-div");
+    const completedDiv = document.getElementById("completed-div");
+    const errorDiv = document.getElementById("error-div");
+
+    document.getElementById("file").addEventListener("change", (e) => {
+      const formData = new FormData();
+      formData.append("video", e.target.files[0]);
+      fetch("/upload-video", {
+        method: "POST",
+        body: formData,
+      })
+        .then((res) => {
+          if (res.ok == false) {
+            errorDiv.style.display = "block";
+          }
+          res.json().then((data) => {
+            uploadDiv.style.display = "none";
+            loadingDiv.style.display = "block";
+            firePolling(data.id);
+          });
+        })
+        .catch((err) => {
+          errorDiv.style.display = "block";
+        });
+    });
+
+    function firePolling(videoId) {
+      const interval = setInterval(() => {
+        fetch(`/video/${videoId}`).then((res) => {
+          res.json().then((data) => {
+            if (data.status == "done") {
+              loadingDiv.style.display = "none";
+              if (data.scales.length == 0) {
+                errorDiv.style.display = "block";
+              }
+              for (let scale of data.scales) {
+                const splitedFileName = data.filename.split(".");
+                const videoExt = splitedFileName[splitedFileName.length - 1];
+                const url = `http://${data.worker_ip}/${videoId}_${scale}.${videoExt}`;
+                const a = document.getElementById(scale);
+                a.href = url;
+                a.style.display = "block";
+              }
+              completedDiv.style.display = "flex";
+              clearInterval(interval);
+            }
+          });
+        });
+      }, 1000);
+    }
+  </script>
+</html>

@@ -26,9 +26,7 @@ func transcodeVideo(inputFileName, scale string, ch chan string) {
 		"-vf", scalesMap[scale], "-c:v", "libx264", "-crf", "23",
 		"-c:a", "copy", "uploads/"+outputFileName)
 
-	if scale == "1080p" {
-		cmd.Run()
-	}
+	cmd.Run()
 	// check if the video exist in the disk
 	if _, err := os.Stat("uploads/" + outputFileName); err != nil {
 		log.Printf("Error transcoding video: %v, scale: %v", err, scale)
@@ -36,7 +34,7 @@ func transcodeVideo(inputFileName, scale string, ch chan string) {
 	}
 }
 
-func Transcode(key string) []string {
+func Transcode(videoId string) []string {
 	var wg sync.WaitGroup
 	errChan := make(chan string, len(scales))
 
@@ -44,7 +42,7 @@ func Transcode(key string) []string {
 		wg.Add(1)
 		go func(scale string) {
 			defer wg.Done()
-			transcodeVideo(key, scale, errChan)
+			transcodeVideo(videoId, scale, errChan)
 		}(scale)
 	}
 
